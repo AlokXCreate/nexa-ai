@@ -1,0 +1,199 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum SubscriptionStatus {
+  FREE
+  PRO
+  ENTERPRISE
+}
+
+enum DocumentStatus {
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum NotificationType {
+  INFO
+  WARNING
+  SYSTEM
+}
+
+model User {
+  id                 String             @id @default(uuid())
+  email              String             @unique
+  passwordHash       String
+  role               Role               @default(USER)
+  subscriptionStatus SubscriptionStatus @default(FREE)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  profile          Profile?
+  chatSessions     ChatSession[]
+  compareSessions  CompareSession[]
+  ragDocuments     RAGDocument[]
+  plugins          Plugin[]
+  notifications    Notification[]
+  payments         Payment[]
+  deviceProfiles   DeviceProfile[]
+}
+
+model Profile {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  firstName String?
+  lastName  String?
+  avatarUrl String?
+  bio       String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ChatSession {
+  id                 String   @id @default(uuid())
+  userId             String
+  title              String
+  folderName         String?  // Folder grouping (e.g. Work, Creative)
+  modelId            String
+  systemPrompt       String?
+  temperature        Float    @default(0.7)
+  tokensPerSecond    Float    @default(0.0)
+  timeToFirstTokenMs Int      @default(0)
+  totalTokens        Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages ChatMessage[]
+}
+
+model ChatMessage {
+  id                 String      @id @default(uuid())
+  sessionId          String
+  role               MessageRole
+  content            String
+  tokensCount        Int         @default(0)
+  inferenceTimeMs    Int         @default(0)
+  tokensPerSecond    Float       @default(0.0)
+  createdAt          DateTime    @default(now())
+
+  session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+model CompareSession {
+  id            String   @id @default(uuid())
+  userId        String
+  title         String
+  modelIdA      String
+  modelIdB      String
+  prompt        String
+  responseA     String
+  responseB     String
+  tokensPerSecA Float    @default(0.0)
+  tokensPerSecB Float    @default(0.0)
+  latencyMsA    Int      @default(0)
+  latencyMsB    Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model RAGDocument {
+  id         String         @id @default(uuid())
+  userId     String
+  title      String
+  fileUrl    String
+  fileType   String
+  sizeBytes  Int
+  chunkCount Int            @default(0)
+  status     DocumentStatus @default(PROCESSING)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chunks RAGChunk[]
+}
+
+model RAGChunk {
+  id         String   @id @default(uuid())
+  documentId String
+  content    String
+  pageNumber Int?
+  createdAt  DateTime @default(now())
+
+  document RAGDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+}
+
+model DeviceProfile {
+  id                     String   @id @default(uuid())
+  userId                 String
+  os                     String
+  cpuCores               Int
+  totalRamGb             Float
+  gpuModel               String?
+  maxSupportedModelSizeGb Float    @default(3.0)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Plugin {
+  id           String   @id @default(uuid())
+  userId       String
+  name         String
+  identifier   String   @unique
+  version      String
+  description  String?
+  icon         String?
+  downloadUrl  String?
+  author       String?
+  activeStatus Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id         String           @id @default(uuid())
+  userId     String
+  title      String
+  content    String
+  type       NotificationType @default(INFO)
+  readStatus Boolean          @default(false)
+  createdAt  DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Payment {
+  id            String   @id @default(uuid())
+  userId        String
+  transactionId String   @unique
+  amount        Float
+  status        String
+  provider      String
+  createdAt     DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
